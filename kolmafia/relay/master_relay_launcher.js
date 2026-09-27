@@ -1,11 +1,11 @@
 (function (w) {
   "use strict";
 
-  var VERSION = "0.2.1";
+  var VERSION = "0.2.2";
   var SCRIPT_ID = "kmr-master-script";
   var CHAT_FRAME = "chatpane";
   var MAIN_FRAME = "mainpane";
-  var INTEGRATED_URL = "/chat.html";
+  var NORMAL_CHAT_URL = "/chatlaunch.php";
   var SPLIT_URL = "/master_relay_split.html";
   var FALLBACK_URL = "/chatlaunch.php";
   var KEY_ENABLED = "kol-topmenu-gcli.enabled";
@@ -77,12 +77,12 @@
   }
 
   function desiredUrl() {
-    return split ? SPLIT_URL : INTEGRATED_URL;
+    return split ? SPLIT_URL : NORMAL_CHAT_URL;
   }
 
   function isManagedUrl(url) {
     var path = pathname(url);
-    return path === INTEGRATED_URL || path === SPLIT_URL;
+    return path === NORMAL_CHAT_URL || path === SPLIT_URL;
   }
 
   function rememberCurrentRight() {
@@ -198,10 +198,10 @@
     isEnabled: function () { return enabled; },
     setSplit: setSplit,
     isSplit: function () { return split; },
-    integrated: function () {
+    normalChat: function () {
       split = false;
       writeBool(KEY_SPLIT, false);
-      return enabled ? ensureManagedPane() : navigateRight(INTEGRATED_URL);
+      return enabled ? ensureManagedPane() : navigateRight(NORMAL_CHAT_URL);
     },
     splitPane: function () {
       split = true;
