@@ -1,14 +1,18 @@
 # kol-topmenu-gcli
 
-A small KoLmafia relay-browser helper that adds a compact **2×2 Master Relay launcher** to the upper-left menu/icon pane so you can switch the existing right-side pane between chat and gCLI without sacrificing chat width.
+A small KoLmafia relay-browser helper that keeps KoLmafia's **integrated Chat / gCLI interface permanently in the existing right-side pane while Master Relay is on**.
 
-It is designed around KoLmafia's existing relay UI rather than replacing it:
+The design deliberately keeps KoLmafia's normal relay-script dropdown as the control entry point instead of adding another launcher over the top menu.
 
-- keeps KoLmafia's normal **`-run script-`** relay dropdown where it already lives;
-- does **not** resize the root frameset or shrink the chat pane;
-- does **not** claim `topmenu.ash` or `game.ash` as permanent overrides;
-- uses the full existing right-side pane for chat/gCLI;
-- re-injects the launcher if the top menu itself reloads during the current relay-browser session.
+When enabled:
+
+- the existing right-side `chatpane` is kept on KoLmafia's native `/chat.html` integrated interface;
+- KoLmafia's own small **Chat / gCLI** controls at the top of that interface remain the primary way to revolve between those views;
+- the outer KoL frameset is not resized;
+- the existing relay-script dropdown is not moved;
+- an optional **Split Chat Pane** can be enabled from Master Relay settings.
+
+Split mode keeps the integrated Chat / gCLI interface on the left and adds a second live chat pane on the right. The divider is draggable and its width is remembered locally by the browser.
 
 ## Install with KoLmafia
 
@@ -20,65 +24,73 @@ git checkout https://github.com/donCannoli-burns/kol-topmenu-gcli main
 
 Then refresh or reopen the Relay Browser.
 
-KoLmafia should add **Master Relay** to its normal `-run script-` relay dropdown. Select **Master Relay** once to activate the launcher for the current relay-browser session.
+KoLmafia should add **Master Relay** to its normal `-run script-` relay dropdown. Select **Master Relay** to open its settings/control page.
+
+## Controls
+
+The Master Relay page contains two simple drop-down controls:
+
+| Setting | Off | On |
+| --- | --- | --- |
+| **Master Relay** | Restores the right-pane page that was present before Master Relay took control. | Keeps the right pane on KoLmafia's native integrated Chat / gCLI interface. |
+| **Split Chat Pane** | Integrated Chat / gCLI uses the full existing right pane. | Integrated Chat / gCLI stays on the left and an additional live chat pane slides in on the right. |
+
+The settings are remembered in browser `localStorage`.
+
+A complete reload of KoL's top-level `game.php` removes the injected controller because this project intentionally does **not** replace `game.php` or `topmenu.php`. Select **Master Relay** from `-run script-` again to reattach it.
+
+## Permanent integrated mode while Relay is on
+
+This project now uses KoLmafia's own integrated page rather than drawing a separate G/C/L/I launcher.
+
+With **Master Relay = On**, the existing `chatpane` is held on:
+
+```text
+/chat.html
+```
+
+That is KoLmafia's native integrated Chat / gCLI interface, including its small top controls for switching between the two views.
+
+If some other browser action navigates the outer right-side pane away while Master Relay is on, the controller returns it to the selected managed view.
+
+With **Master Relay = Off**, that enforcement stops and the pre-relay right-pane page is restored when available.
+
+## Split Chat Pane
+
+Set **Split Chat Pane = On** from the Master Relay settings page.
+
+The right pane becomes:
+
+```text
+┌──────────────────────┬─┬─────────────────┐
+│ Integrated Chat/gCLI │↔│ Persistent Chat │
+│      /chat.html      │ │    /lchat.php   │
+└──────────────────────┴─┴─────────────────┘
+```
+
+The center divider can be dragged horizontally. The split ratio is stored in browser `localStorage`, so reopening split mode returns to the last width you used.
+
+The small divider button collapses/restores the extra chat pane without disabling the setting. To return completely to normal single-pane integrated mode, set **Split Chat Pane = Off** in Master Relay settings.
+
+Importantly, split mode divides **only the existing right-side pane**. It does not make KoL's outer chat area wider or narrower and it does not reduce the main game pane by editing `rootset.cols`.
+
+## Why `/chat.html` is the authority
+
+KoLmafia already ships an integrated Chat / gCLI page. This project uses that existing UI rather than recreating its command console or chat logic.
+
+That means the project only manages which page lives in `chatpane`; KoLmafia remains responsible for the actual Chat/gCLI interface and command submission behavior.
 
 ## Manual install
 
-Copy these two files into your KoLmafia `relay/` directory:
+Copy these files into your KoLmafia `relay/` directory:
 
 ```text
 relay_Master_Relay.ash
 master_relay_launcher.js
+master_relay_split.html
 ```
 
-Then refresh or reopen the Relay Browser and select **Master Relay** from the relay dropdown.
-
-## Launcher layout
-
-```text
-+---+---+
-| G | C |
-+---+---+
-| L | I |
-+---+---+
-```
-
-| Button | Action |
-| --- | --- |
-| **G** | Opens KoLmafia's native `/cli.html` in the full existing right pane. |
-| **C** | Opens `/chatlaunch.php` in the full existing right pane. |
-| **L** | Returns to the previous right-pane URL. |
-| **I** | Opens KoLmafia's native `/chat.html` integrated Chat / gCLI page. |
-
-Hover over the square—or keyboard-focus one of its buttons—and its small information drawer slides out to the right. Only the launcher's overlay expands; it does not change frame dimensions.
-
-## What it deliberately does not move
-
-The existing KoLmafia relay-script dropdown is treated as authoritative UI. The launcher does not relocate it.
-
-The preferred launcher position is the upper-left corner of the menu pane. If that area would overlap the existing relay dropdown, the launcher moves itself below the dropdown instead.
-
-## Chat width is preserved
-
-The launcher never edits KoL's root frameset, `rootset.cols`, or the `chatpane` width. Switching between Chat, gCLI, and Integrated simply changes the URL loaded into the already-existing right-side frame.
-
-This is the main reason for the design: **gCLI becomes directly available without trading away chat-pane space.**
-
-## Session behavior
-
-Activation is browser-session scoped.
-
-After selecting **Master Relay**, the launcher is installed into the top `game.php` document and watches `menupane` reloads so the 2×2 launcher can be re-injected when KoL refreshes the top menu.
-
-A full reload/recreation of `game.php` clears that injected state. If that happens, just choose **Master Relay** from `-run script-` again.
-
-This avoids permanently overriding `game.php` or `topmenu.php`, which makes the helper much less likely to collide with unrelated relay overrides.
-
-## Disable without uninstalling
-
-Select **Master Relay** from the relay dropdown again and click **Disable dock**.
-
-That removes the browser-side launcher for the current page. It does not change KoL character/account state.
+Then refresh or reopen the Relay Browser and select **Master Relay** from KoLmafia's relay dropdown.
 
 ## Update
 
@@ -88,7 +100,7 @@ Use KoLmafia's normal Git update command:
 git update kol-topmenu-gcli
 ```
 
-If KoLmafia identifies the checkout under a slightly different project name, `git list` will show the installed Git projects and their names.
+If KoLmafia identifies the checkout under a different project name, `git list` will show the installed Git projects and their names.
 
 ## Uninstall
 
@@ -97,6 +109,7 @@ Use KoLmafia's Git manager/gCLI to remove the installed project, or manually rem
 ```text
 relay_Master_Relay.ash
 master_relay_launcher.js
+master_relay_split.html
 ```
 
 Refresh the Relay Browser afterward.
@@ -111,41 +124,50 @@ kol-topmenu-gcli/
 └── kolmafia/
     └── relay/
         ├── relay_Master_Relay.ash
-        └── master_relay_launcher.js
+        ├── master_relay_launcher.js
+        └── master_relay_split.html
 ```
 
-`manifest.json` declares `kolmafia/` as the KoLmafia installation root, allowing the Git checkout to place the relay files in the expected `relay/` subtree.
+`manifest.json` declares `kolmafia/` as the KoLmafia installation root, so KoLmafia's Git checkout places the three runtime files into `relay/`.
 
-## Technical notes
+## Technical behavior
 
-The relay entry point is `relay_Master_Relay.ash`. KoLmafia recognizes `relay_*.ash` relay scripts and exposes them through its relay-script menu. When selected, the ASH page injects `master_relay_launcher.js` into the top relay-browser document.
+`relay_Master_Relay.ash` is the relay-menu entry point and settings page. On load it attaches `master_relay_launcher.js` to the top Relay Browser document.
 
-The JavaScript then:
+The controller:
 
-1. locates the existing named `menupane`, `chatpane`, and `mainpane` frames;
-2. injects the 60×60 2×2 launcher into `menupane`;
-3. detects the existing `-run script-` dropdown and avoids covering it;
-4. changes only `chatpane.location.href` when **G**, **C**, **L**, or **I** is selected;
-5. listens for menu-frame reloads and restores the dock while the session injection remains active.
+1. finds the existing named `chatpane` and `mainpane` frames;
+2. remembers the current right-pane URL before taking control;
+3. keeps `chatpane` on `/chat.html` while Master Relay is on;
+4. uses `/master_relay_split.html` instead when Split Chat Pane is on;
+5. watches right-pane loads so managed mode remains permanent while enabled;
+6. restores the previous right-pane URL when Master Relay is turned off;
+7. stores the enabled/split settings in browser `localStorage`.
 
-No network service or external runtime is required beyond KoLmafia's normal Relay Browser.
+`master_relay_split.html` is a same-origin wrapper. It embeds KoLmafia's native `/chat.html` on the left and `/lchat.php` on the right, with a draggable divider and an iframe-safe drag shield.
+
+No external service or runtime is required beyond KoLmafia's normal Relay Browser.
 
 ## Testing checklist
 
-After installation:
+After installing/updating:
 
 - [ ] Open the Relay Browser.
-- [ ] Confirm **Master Relay** appears in `-run script-`.
-- [ ] Select **Master Relay**.
-- [ ] Confirm the 2×2 **G C / L I** square appears in the upper-left menu/icon pane.
-- [ ] Confirm the existing relay dropdown has not moved.
-- [ ] Confirm the right-side pane has not become narrower.
-- [ ] Click **G** and execute a harmless gCLI command such as `version`.
-- [ ] Click **C** and confirm normal chat returns in the same full-width right pane.
-- [ ] Click **I** and confirm KoLmafia's integrated Chat / gCLI UI loads.
-- [ ] Use **L** and confirm it returns to the previous right-pane view.
-- [ ] Trigger a normal top-menu refresh and confirm the launcher reappears.
-- [ ] Reload the whole Relay Browser and confirm selecting **Master Relay** again restores it.
+- [ ] Confirm **Master Relay** appears in KoLmafia's existing `-run script-` dropdown.
+- [ ] Select **Master Relay** and confirm the settings page opens in `mainpane`.
+- [ ] Confirm **Master Relay = On** loads KoLmafia's native integrated `/chat.html` in the existing right pane.
+- [ ] Confirm the native small **Chat / gCLI** controls work repeatedly without changing the outer pane width.
+- [ ] Confirm the old custom G/C/L/I square is gone.
+- [ ] Confirm KoLmafia's existing relay dropdown has not moved.
+- [ ] Set **Split Chat Pane = On**.
+- [ ] Confirm integrated Chat/gCLI remains on the left and a second live chat appears on the right.
+- [ ] Drag the divider and confirm both panes resize inside the existing right pane.
+- [ ] Reload split mode and confirm the saved divider position returns.
+- [ ] Use the divider's collapse button and confirm the extra chat slides away/restores.
+- [ ] Set **Split Chat Pane = Off** and confirm full-width integrated mode returns.
+- [ ] Set **Master Relay = Off** and confirm the pre-relay right-pane page is restored.
+- [ ] Turn Master Relay back on and confirm managed integrated mode returns.
+- [ ] Reload the whole Relay Browser, select **Master Relay** again, and confirm the remembered On/Off and Split settings are restored.
 
 ## License
 
