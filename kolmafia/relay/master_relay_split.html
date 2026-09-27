@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Master Relay Split Chat</title>
+<style>
+html,body{width:100%;height:100%;margin:0;padding:0;overflow:hidden;background:#fff;font-family:Arial,Helvetica,sans-serif}
+#kmr-stage{position:absolute;inset:0;display:flex;min-width:0;min-height:0}
+.kmr-pane{height:100%;min-width:0;overflow:hidden;background:#fff}
+#kmr-integrated{flex:0 0 58%}
+#kmr-chat{flex:1 1 auto}
+.kmr-pane iframe{display:block;width:100%;height:100%;border:0;margin:0;padding:0;background:#fff}
+#kmr-divider{position:relative;flex:0 0 9px;width:9px;height:100%;cursor:col-resize;background:#dedede;border-left:1px solid #aaa;border-right:1px solid #aaa;box-sizing:border-box;z-index:4}
+#kmr-divider:before{content:"";position:absolute;left:3px;top:calc(50% - 28px);width:1px;height:56px;background:#888;box-shadow:2px 0 0 #aaa}
+#kmr-collapse{position:absolute;left:-7px;top:8px;width:21px;height:21px;padding:0;border:1px solid #777;border-radius:2px;background:#fff;color:#111;font:700 12px/19px Arial,Helvetica,sans-serif;cursor:pointer;z-index:5}
+#kmr-collapse:hover,#kmr-collapse:focus{background:#e8f0ff;outline:1px solid #315f9f;outline-offset:-2px}
+#kmr-shield{display:none;position:fixed;inset:0;z-index:99999;cursor:col-resize;background:rgba(0,0,0,0)}
+body.kmr-dragging #kmr-shield{display:block}
+body.kmr-collapsed #kmr-chat{display:none}
+body.kmr-collapsed #kmr-integrated{flex:1 1 auto!important}
+body.kmr-collapsed #kmr-divider{cursor:default}
+body.kmr-collapsed #kmr-divider:before{display:none}
+</style>
+</head>
+<body>
+<div id="kmr-stage">
+  <section id="kmr-integrated" class="kmr-pane" aria-label="KoLmafia integrated Chat and gCLI">
+    <iframe src="/chat.html" title="Integrated Chat and gCLI"></iframe>
+  </section>
+  <div id="kmr-divider" role="separator" aria-orientation="vertical" aria-label="Drag to resize split chat">
+    <button id="kmr-collapse" type="button" title="Collapse or restore the extra chat pane" aria-label="Collapse or restore extra chat">›</button>
+  </div>
+  <section id="kmr-chat" class="kmr-pane" aria-label="Persistent chat pane">
+    <iframe src="/lchat.php" title="Persistent Chat"></iframe>
+  </section>
+</div>
+<div id="kmr-shield"></div>
+<script>
+(function(){
+  "use strict";
+  var KEY_RATIO="kol-topmenu-gcli.split.ratio";
+  var KEY_COLLAPSED="kol-topmenu-gcli.split.collapsed";
+  var integrated=document.getElementById("kmr-integrated");
+  var divider=document.getElementById("kmr-divider");
+  var collapse=document.getElementById("kmr-collapse");
+  var shield=document.getElementById("kmr-shield");
+  var dragging=false;
+  var lastRatio=58;
+
+  function clamp(value){return Math.max(28,Math.min(78,value));}
+  function readRatio(){
+    try{var v=parseFloat(localStorage.getItem(KEY_RATIO));return isFinite(v)?clamp(v):58;}catch(e){return 58;}
+  }
+  function writeRatio(value){try{localStorage.setItem(KEY_RATIO,String(value));}catch(e){}}
+  function readCollapsed(){try{return localStorage.getItem(KEY_COLLAPSED)==="1";}catch(e){return false;}}
+  function writeCollapsed(value){try{localStorage.setItem(KEY_COLLAPSED,value?"1":"0");}catch(e){}}
+  function applyRatio(value){
+    lastRatio=clamp(value);
+    integrated.style.flex="0 0 "+lastRatio+"%";
+    writeRatio(lastRatio);
+  }
+  function setCollapsed(value){
+    value=!!value;
+    document.body.className=value?"kmr-collapsed":"";
+    collapse.textContent=value?"‹":"›";
+    collapse.title=value?"Restore extra chat pane":"Collapse extra chat pane";
+    divider.style.cursor=value?"default":"col-resize";
+    writeCollapsed(value);
+    if(!value) applyRatio(lastRatio);
+  }
+  function eventX(e){
+    if(e.touches&&e.touches.length)return e.touches[0].clientX;
+    return e.clientX;
+  }
+  function move(e){
+    if(!dragging)return;
+    if(e.preventDefault)e.preventDefault();
+    var width=document.documentElement.clientWidth||document.body.clientWidth||1;
+    applyRatio((eventX(e)/width)*100);
+  }
+  function stop(e){
+    if(!dragging)return;
+    dragging=false;
+    document.body.className=document.body.className.replace(/\s*kmr-dragging\b/g,"");
+    if(e&&e.preventDefault)e.preventDefault();
+  }
+  function start(e){
+    if(document.body.className.indexOf("kmr-collapsed")!==-1)return;
+    dragging=true;
+    if(document.body.className.indexOf("kmr-dragging")===-1)document.body.className+=" kmr-dragging";
+    if(e.preventDefault)e.preventDefault();
+  }
+
+  divider.onmousedown=start;
+  divider.ontouchstart=start;
+  shield.onmousemove=move;
+  shield.ontouchmove=move;
+  shield.onmouseup=stop;
+  shield.ontouchend=stop;
+  window.onmouseup=stop;
+  window.ontouchend=stop;
+  collapse.onclick=function(e){
+    if(e&&e.stopPropagation)e.stopPropagation();
+    setCollapsed(document.body.className.indexOf("kmr-collapsed")===-1);
+    return false;
+  };
+
+  lastRatio=readRatio();
+  applyRatio(lastRatio);
+  setCollapsed(readCollapsed());
+})();
+</script>
+</body>
+</html>
