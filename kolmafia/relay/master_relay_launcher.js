@@ -1,25 +1,42 @@
 (function (w) {
   "use strict";
 
-  var VERSION = "0.1.0";
-  var DOCK_ID = "kmr-dock";
-  var STYLE_ID = "kmr-style";
+  var VERSION = "0.2.0";
   var SCRIPT_ID = "kmr-master-script";
-  var MENU_FRAME = "menupane";
   var CHAT_FRAME = "chatpane";
   var MAIN_FRAME = "mainpane";
+  var INTEGRATED_URL = "/chat.html";
+  var SPLIT_URL = "/master_relay_split.html";
+  var FALLBACK_URL = "/chatlaunch.php";
+  var KEY_ENABLED = "kol-topmenu-gcli.enabled";
+  var KEY_SPLIT = "kol-topmenu-gcli.split";
+
+  function readBool(key, fallback) {
+    try {
+      var value = w.localStorage.getItem(key);
+      if (value === null) return fallback;
+      return value === "1" || value === "true" || value === "on";
+    } catch (e) {
+      return fallback;
+    }
+  }
+
+  function writeBool(key, value) {
+    try {
+      w.localStorage.setItem(key, value ? "1" : "0");
+    } catch (e) {}
+  }
 
   if (w.KoLMasterRelay && w.KoLMasterRelay.version) {
-    w.KoLMasterRelay.enable();
+    w.KoLMasterRelay.refresh();
     return;
   }
 
-  var enabled = true;
-  var menuFrameElement = null;
-  var lastRightUrl = null;
-  var menuLoadHandler = function () {
-    window.setTimeout(injectDock, 0);
-  };
+  var enabled = readBool(KEY_ENABLED, true);
+  var split = readBool(KEY_SPLIT, false);
+  var previousRightUrl = null;
+  var chatFrameElement = null;
+  var enforcing = false;
 
   function getFrame(name) {
     try {
@@ -39,52 +56,77 @@
     }
   }
 
-  function shortRightLabel(url) {
+  function pathname(url) {
     url = String(url || "");
-    if (/\/cli\.html(?:[?#]|$)/.test(url)) return "gCLI";
-    if (/\/chat\.html(?:[?#]|$)/.test(url)) return "integrated";
-    if (/\/chatlaunch\.php(?:[?#]|$)/.test(url)) return "chat";
-    return url ? "custom" : "unknown";
+    var match = url.match(/^https?:\/\/[^/]+(\/[^?#]*)/i);
+    if (match) return match[1];
+    match = url.match(/^(\/[^?#]*)/);
+    return match ? match[1] : url.split(/[?#]/)[0];
+  }
+
+  function desiredUrl() {
+    return split ? SPLIT_URL : INTEGRATED_URL;
+  }
+
+  function isManagedUrl(url) {
+    var path = pathname(url);
+    return path === INTEGRATED_URL || path === SPLIT_URL;
   }
 
   function rememberCurrentRight() {
-    var url = currentRightUrl();
-    if (url && url.indexOf("relay_Master_Relay.ash") === -1) {
-      lastRightUrl = url;
+    var current = currentRightUrl();
+    if (current && !isManagedUrl(current) && current.indexOf("relay_Master_Relay.ash") === -1) {
+      previousRightUrl = current;
     }
   }
 
   function navigateRight(url) {
     var frame = getFrame(CHAT_FRAME);
     if (!frame) return false;
-
-    var current = currentRightUrl();
-    if (current && current !== url) lastRightUrl = current;
-
     try {
       frame.location.href = url;
-      window.setTimeout(updateStatus, 80);
       return true;
     } catch (e) {
       return false;
     }
   }
 
-  function goLast() {
+  function ensureManagedPane() {
+    if (!enabled || enforcing) return;
     var frame = getFrame(CHAT_FRAME);
-    if (!frame) return false;
+    if (!frame) return;
 
+    var target = desiredUrl();
     var current = currentRightUrl();
-    var target = lastRightUrl || "/chatlaunch.php";
-    if (current === target) target = "/chatlaunch.php";
+    if (pathname(current) === target) return;
 
-    lastRightUrl = current || lastRightUrl;
+    enforcing = true;
+    navigateRight(target);
+    w.setTimeout(function () { enforcing = false; }, 120);
+  }
+
+  function onChatFrameLoad() {
+    if (!enabled) return;
+    w.setTimeout(ensureManagedPane, 0);
+  }
+
+  function attachChatLoadListener() {
+    var frame = null;
     try {
-      frame.location.href = target;
-      window.setTimeout(updateStatus, 80);
-      return true;
+      frame = w.document.querySelector("frame[name='" + CHAT_FRAME + "'],iframe[name='" + CHAT_FRAME + "']");
     } catch (e) {
-      return false;
+      frame = null;
+    }
+
+    if (frame === chatFrameElement) return;
+
+    if (chatFrameElement && chatFrameElement.removeEventListener) {
+      chatFrameElement.removeEventListener("load", onChatFrameLoad, false);
+    }
+
+    chatFrameElement = frame;
+    if (chatFrameElement && chatFrameElement.addEventListener) {
+      chatFrameElement.addEventListener("load", onChatFrameLoad, false);
     }
   }
 
@@ -99,219 +141,74 @@
     }
   }
 
-  function styleText() {
-    return [
-      "#" + DOCK_ID + "{position:absolute;left:4px;top:4px;z-index:2147483000;width:60px;height:60px;font-family:Arial,Helvetica,sans-serif;font-size:9px;line-height:1.15;color:#111;}",
-      "#" + DOCK_ID + " *{box-sizing:border-box;}",
-      "#" + DOCK_ID + " .kmr-shell{display:flex;width:60px;height:60px;overflow:hidden;background:rgba(255,255,255,.97);border:1px solid #777;box-shadow:1px 1px 4px rgba(0,0,0,.28);transition:width .16s ease-in-out;}",
-      "#" + DOCK_ID + ":hover .kmr-shell,#" + DOCK_ID + ":focus-within .kmr-shell,#" + DOCK_ID + ".kmr-open .kmr-shell{width:218px;}",
-      "#" + DOCK_ID + " .kmr-grid{flex:0 0 58px;width:58px;height:58px;padding:1px;display:grid;grid-template-columns:28px 28px;grid-template-rows:28px 28px;gap:1px;background:#eee;}",
-      "#" + DOCK_ID + " .kmr-btn{display:block;width:28px;height:28px;margin:0;padding:0;border:1px solid #777;border-radius:2px;background:#fff;color:#111;font:700 11px/26px Arial,Helvetica,sans-serif;text-align:center;cursor:pointer;box-shadow:inset 0 1px 0 #fff;}",
-      "#" + DOCK_ID + " .kmr-btn:hover,#" + DOCK_ID + " .kmr-btn:focus{background:#e8f0ff;outline:1px solid #315f9f;outline-offset:-2px;}",
-      "#" + DOCK_ID + " .kmr-slide{flex:0 0 158px;width:158px;height:58px;padding:5px 6px;border-left:1px solid #aaa;background:#fff;overflow:hidden;white-space:nowrap;}",
-      "#" + DOCK_ID + " .kmr-title{font-weight:bold;font-size:10px;margin-bottom:3px;}",
-      "#" + DOCK_ID + " .kmr-status{color:#444;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;}",
-      "#" + DOCK_ID + " .kmr-help{color:#666;font-size:8px;}",
-      "#" + DOCK_ID + " .kmr-settings{margin-left:4px;color:#0645ad;text-decoration:underline;cursor:pointer;border:0;background:transparent;padding:0;font:9px Arial,Helvetica,sans-serif;}",
-      "#" + DOCK_ID + " .kmr-settings:hover{color:#003078;}"
-    ].join("\n");
-  }
-
-  function ensureStyle(doc) {
-    if (doc.getElementById(STYLE_ID)) return;
-    var style = doc.createElement("style");
-    style.id = STYLE_ID;
-    style.type = "text/css";
-    if (style.styleSheet) style.styleSheet.cssText = styleText();
-    else style.appendChild(doc.createTextNode(styleText()));
-    (doc.head || doc.getElementsByTagName("head")[0] || doc.documentElement).appendChild(style);
-  }
-
-  function findRelaySelect(doc) {
-    var selects = doc.getElementsByTagName("select");
-    var i;
-    for (i = 0; i < selects.length; i++) {
-      var s = selects[i];
-      if (!s.options || !s.options.length) continue;
-      var first = String(s.options[0].text || s.options[0].innerText || "").toLowerCase();
-      if (first.indexOf("run script") !== -1) return s;
-    }
-    return null;
-  }
-
-  function avoidMasterDropdown(doc, dock) {
-    var select = findRelaySelect(doc);
-    if (!select || !select.getBoundingClientRect) return;
-
-    var r = select.getBoundingClientRect();
-    var desired = { left: 4, right: 222, top: 4, bottom: 64 };
-    var overlaps = !(r.right < desired.left || r.left > desired.right || r.bottom < desired.top || r.top > desired.bottom);
-
-    if (overlaps) {
-      dock.style.top = Math.ceil(r.bottom + 4) + "px";
-    }
-  }
-
-  function makeButton(doc, code, title, handler) {
-    var b = doc.createElement("button");
-    b.type = "button";
-    b.className = "kmr-btn";
-    b.appendChild(doc.createTextNode(code));
-    b.title = title;
-    b.setAttribute("aria-label", title);
-    b.onclick = function (e) {
-      if (e && e.preventDefault) e.preventDefault();
-      if (e && e.stopPropagation) e.stopPropagation();
-      handler();
-      return false;
-    };
-    return b;
-  }
-
-  function buildDock(doc) {
-    var dock = doc.createElement("div");
-    dock.id = DOCK_ID;
-    dock.setAttribute("role", "group");
-    dock.setAttribute("aria-label", "KoLmafia Master Relay right-pane switcher");
-
-    var shell = doc.createElement("div");
-    shell.className = "kmr-shell";
-
-    var grid = doc.createElement("div");
-    grid.className = "kmr-grid";
-    grid.appendChild(makeButton(doc, "G", "gCLI — use the full existing right pane", function () { navigateRight("/cli.html"); }));
-    grid.appendChild(makeButton(doc, "C", "Chat — use the full existing right pane", function () { navigateRight("/chatlaunch.php"); }));
-    grid.appendChild(makeButton(doc, "L", "Last — return to the previous right-pane page", goLast));
-    grid.appendChild(makeButton(doc, "I", "Integrated — KoLmafia native Chat + gCLI page", function () { navigateRight("/chat.html"); }));
-
-    var slide = doc.createElement("div");
-    slide.className = "kmr-slide";
-
-    var title = doc.createElement("div");
-    title.className = "kmr-title";
-    title.appendChild(doc.createTextNode("Master Relay"));
-
-    var status = doc.createElement("div");
-    status.className = "kmr-status";
-    status.id = "kmr-status";
-
-    var help = doc.createElement("div");
-    help.className = "kmr-help";
-    help.appendChild(doc.createTextNode("G gCLI · C chat · L last · I integrated"));
-
-    var settings = doc.createElement("button");
-    settings.type = "button";
-    settings.className = "kmr-settings";
-    settings.appendChild(doc.createTextNode("settings"));
-    settings.onclick = function () {
-      openSettings();
-      return false;
-    };
-    help.appendChild(settings);
-
-    slide.appendChild(title);
-    slide.appendChild(status);
-    slide.appendChild(help);
-    shell.appendChild(grid);
-    shell.appendChild(slide);
-    dock.appendChild(shell);
-
-    return dock;
-  }
-
-  function menuDocument() {
-    var frame = getFrame(MENU_FRAME);
-    if (!frame) return null;
-    try {
-      return frame.document || null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  function removeDock() {
-    var doc = menuDocument();
-    if (!doc) return;
-    var dock = doc.getElementById(DOCK_ID);
-    if (dock && dock.parentNode) dock.parentNode.removeChild(dock);
-  }
-
-  function updateStatus() {
-    var doc = menuDocument();
-    if (!doc) return;
-    var el = doc.getElementById("kmr-status");
-    if (!el) return;
-    var current = shortRightLabel(currentRightUrl());
-    var last = shortRightLabel(lastRightUrl);
-    el.textContent = "right pane: " + current + (lastRightUrl ? " · last: " + last : "");
-  }
-
-  function injectDock() {
-    if (!enabled) return;
-    var doc = menuDocument();
-    if (!doc || !doc.body) return;
-
-    ensureStyle(doc);
-    var old = doc.getElementById(DOCK_ID);
-    if (old && old.parentNode) old.parentNode.removeChild(old);
-
-    var dock = buildDock(doc);
-    doc.body.appendChild(dock);
-    avoidMasterDropdown(doc, dock);
-    updateStatus();
-  }
-
-  function attachMenuLoadListener() {
-    var frame = null;
-    try {
-      frame = w.document.querySelector("frame[name='" + MENU_FRAME + "'],iframe[name='" + MENU_FRAME + "']");
-    } catch (e) {
-      frame = null;
-    }
-
-    if (frame === menuFrameElement) return;
-
-    if (menuFrameElement && menuFrameElement.removeEventListener) {
-      menuFrameElement.removeEventListener("load", menuLoadHandler, false);
-    }
-
-    menuFrameElement = frame;
-    if (menuFrameElement && menuFrameElement.addEventListener) {
-      menuFrameElement.addEventListener("load", menuLoadHandler, false);
-    }
-  }
-
   function enable() {
+    if (!enabled) rememberCurrentRight();
     enabled = true;
-    if (!lastRightUrl) rememberCurrentRight();
-    attachMenuLoadListener();
-    injectDock();
+    writeBool(KEY_ENABLED, true);
+    attachChatLoadListener();
+    ensureManagedPane();
+    return true;
   }
 
   function disable() {
     enabled = false;
-    removeDock();
+    writeBool(KEY_ENABLED, false);
+    var restore = previousRightUrl || FALLBACK_URL;
+    if (isManagedUrl(currentRightUrl())) navigateRight(restore);
+    return true;
   }
+
+  function setSplit(value) {
+    split = !!value;
+    writeBool(KEY_SPLIT, split);
+    if (enabled) ensureManagedPane();
+    return split;
+  }
+
+  function refresh() {
+    enabled = readBool(KEY_ENABLED, enabled);
+    split = readBool(KEY_SPLIT, split);
+    attachChatLoadListener();
+    if (enabled) {
+      rememberCurrentRight();
+      ensureManagedPane();
+    }
+  }
+
+  rememberCurrentRight();
+  attachChatLoadListener();
 
   w.KoLMasterRelay = {
     version: VERSION,
     enable: enable,
     disable: disable,
-    inject: injectDock,
-    gcli: function () { return navigateRight("/cli.html"); },
-    chat: function () { return navigateRight("/chatlaunch.php"); },
-    integrated: function () { return navigateRight("/chat.html"); },
-    last: goLast,
+    setEnabled: function (value) { return value ? enable() : disable(); },
+    isEnabled: function () { return enabled; },
+    setSplit: setSplit,
+    isSplit: function () { return split; },
+    integrated: function () {
+      split = false;
+      writeBool(KEY_SPLIT, false);
+      return enabled ? ensureManagedPane() : navigateRight(INTEGRATED_URL);
+    },
+    splitPane: function () {
+      split = true;
+      writeBool(KEY_SPLIT, true);
+      return enabled ? ensureManagedPane() : navigateRight(SPLIT_URL);
+    },
     settings: openSettings,
+    refresh: refresh,
     status: function () {
       return {
         enabled: enabled,
+        split: split,
+        desiredUrl: desiredUrl(),
         currentRightUrl: currentRightUrl(),
-        lastRightUrl: lastRightUrl
+        previousRightUrl: previousRightUrl
       };
     },
     scriptId: SCRIPT_ID
   };
 
-  enable();
+  if (enabled) ensureManagedPane();
 })(window);
