@@ -1,0 +1,33 @@
+void main() {
+  writeln("<!doctype html>");
+  writeln("<html><head><meta charset='utf-8'><title>Master Relay</title>");
+  writeln("<style>");
+  writeln("body{font-family:Arial,Helvetica,sans-serif;background:#fff;color:#111;margin:18px;line-height:1.35}h1{font-size:20px;margin:0 0 8px}.box{max-width:680px;border:1px solid #888;padding:14px;background:#fafafa}.row{margin:10px 0}.key{display:inline-block;min-width:20px;padding:2px 5px;margin-right:4px;border:1px solid #777;background:#fff;text-align:center;font-weight:bold}button{font:12px Arial,Helvetica,sans-serif;padding:4px 9px;margin:2px 4px 2px 0}.ok{color:#166b16;font-weight:bold}.muted{color:#666;font-size:11px}code{background:#eee;padding:1px 3px}");
+  writeln("</style></head><body>");
+  writeln("<div class='box'><h1>KoLmafia Master Relay</h1>");
+  writeln("<div class='ok'>Activated for this relay-browser session.</div>");
+  writeln("<p>The launcher is injected into the existing top-left menu pane. It does not resize the chat pane and it does not move KoLmafia's existing relay-script dropdown.</p>");
+  writeln("<div class='row'><span class='key'>G</span> gCLI &nbsp; <span class='key'>C</span> Chat &nbsp; <span class='key'>L</span> Last right-pane view &nbsp; <span class='key'>I</span> Integrated Chat + gCLI</div>");
+  writeln("<div class='row'><button onclick='return kmrEnable();'>Enable / re-inject</button><button onclick='return kmrDisable();'>Disable dock</button><button onclick='return kmrG();'>gCLI</button><button onclick='return kmrC();'>Chat</button><button onclick='return kmrI();'>Integrated</button></div>");
+  writeln("<p class='muted'>The 2x2 dock is 60x60 px until hovered or keyboard-focused; only its own drawer expands. A full reload of <code>game.php</code> ends this session injection; select Master Relay from the relay dropdown again to restore it.</p></div>");
+  writeln("<script>");
+  writeln("function kmrApi(){try{return top.KoLMasterRelay||null;}catch(e){return null;}}");
+  writeln("function kmrEnable(){var a=kmrApi();if(a)a.enable();return false;}");
+  writeln("function kmrDisable(){var a=kmrApi();if(a)a.disable();return false;}");
+  writeln("function kmrG(){var a=kmrApi();if(a)a.gcli();return false;}");
+  writeln("function kmrC(){var a=kmrApi();if(a)a.chat();return false;}");
+  writeln("function kmrI(){var a=kmrApi();if(a)a.integrated();return false;}");
+  writeln("(function(){");
+  writeln("  try{");
+  writeln("    var d=top.document;");
+  writeln("    var existing=d.getElementById('kmr-master-script');");
+  writeln("    if(existing){if(top.KoLMasterRelay)top.KoLMasterRelay.enable();return;}");
+  writeln("    var s=d.createElement('script');");
+  writeln("    s.id='kmr-master-script';");
+  writeln("    s.src='/master_relay_launcher.js?v=0.1.0';");
+  writeln("    s.onload=function(){if(top.KoLMasterRelay)top.KoLMasterRelay.enable();};");
+  writeln("    (d.head||d.documentElement).appendChild(s);");
+  writeln("  }catch(e){document.body.insertAdjacentHTML('beforeend','<p><b>Could not inject Master Relay:</b> '+String(e)+'</p>');}");
+  writeln("})();");
+  writeln("</script></body></html>");
+}
