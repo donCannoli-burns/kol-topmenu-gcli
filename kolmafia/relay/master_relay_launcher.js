@@ -1,7 +1,7 @@
 (function (w) {
   "use strict";
 
-  var VERSION = "0.2.0";
+  var VERSION = "0.2.1";
   var SCRIPT_ID = "kmr-master-script";
   var CHAT_FRAME = "chatpane";
   var MAIN_FRAME = "mainpane";
@@ -27,9 +27,21 @@
     } catch (e) {}
   }
 
-  if (w.KoLMasterRelay && w.KoLMasterRelay.version) {
+  if (w.KoLMasterRelay && w.KoLMasterRelay.version === VERSION && typeof w.KoLMasterRelay.refresh === "function") {
     w.KoLMasterRelay.refresh();
     return;
+  }
+
+  // Cleanly replace an older in-page controller after a git update.
+  if (w.KoLMasterRelay) {
+    try {
+      if (typeof w.KoLMasterRelay.disable === "function") w.KoLMasterRelay.disable();
+    } catch (e) {}
+    try {
+      delete w.KoLMasterRelay;
+    } catch (e) {
+      w.KoLMasterRelay = null;
+    }
   }
 
   var enabled = readBool(KEY_ENABLED, true);
